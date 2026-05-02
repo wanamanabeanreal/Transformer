@@ -5,7 +5,9 @@
 #ifndef TRANSFORMER_VECTOR_H
 #define TRANSFORMER_VECTOR_H
 
+#include <cassert>
 #include <cstdlib>
+#include <immintrin.h> // Required for _mm_malloc
 
 template <typename T>
 class fixedvector { //EVENTUALLY: replace malloc, C++ ptr with custom implementations.
@@ -61,8 +63,67 @@ class fixedvector { //EVENTUALLY: replace malloc, C++ ptr with custom implementa
             other.capacity = 0;
         }
 
-                        //move ctor assigment
-                        //destructor
+        fixedvector& operator=(fixedvector&& other) noexcept{   //move ctor assigment
+            if (this != &other) {
+                _mm_free(data);
+                data = other.data;
+                size = other.size;
+                capacity = other.capacity;
+                other.data = nullptr;
+                other.size = 0;
+                other.capacity = 0;
+            }
+            return *this;
+        }
+
+        ~fixedvector() {      //destructor
+            _mm_free(data);
+        }
+        //other operators
+        fixedvector operator+(const fixedvector& other) const { //addition
+            assert(size == other.size);
+            fixedvector result = fixedvector(size);
+            for (size_t i = 0; i < size; i++) {
+                result.data[i] = data[i] + other.data[i];
+            }
+            return result;
+        }
+
+        fixedvector& operator*(size_t n) { //scalar mult
+            for (size_t i = 0; i < size; i++) {
+                data[i] *= n;
+            }
+            return *this;
+        }
+
+        T operator*(const fixedvector& other) const { //dot product
+            assert(size == other.size);
+            T sum = 0;
+            for (size_t i = 0; i < size; i++) {
+                sum += data[i] * other.data[i];
+            }
+            return sum;
+        }
+
+        T& operator [](size_t i) {
+            return data[i];
+        }
+
+        //acessors
+        const T& operator [](size_t i) const {
+            return data[i];
+        }
+
+        T* get_data() {
+            return data;
+        }
+        const T* get_data() const{
+            return data;
+        }
+
+        size_t get_size() const {
+            return size;
+        }
 
 
 };
