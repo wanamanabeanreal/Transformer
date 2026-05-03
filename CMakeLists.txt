@@ -6,5 +6,5 @@ set(CMAKE_CXX_STANDARD 20)
 add_executable(transformer main.cpp
         vector.h
         matrix.h
-        vector.cpp
-        matrix.cpp)
+        math.cpp
+        layer.cpp)
