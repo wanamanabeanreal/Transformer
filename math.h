@@ -139,6 +139,10 @@ namespace fastmath {
                     dst[i] = src[i];
                 }
             }
+
+
+    //matrixOPS next:
+
 }
 
 #endif //TRANSFORMER_MATH_H

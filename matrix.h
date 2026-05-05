@@ -27,14 +27,28 @@ class matrix {
             assert(data != nullptr);
         }
 
-        matrix(const matrix& other) = delete; //copy ctor, force delete, matrices are too big
+        matrix(const matrix& other) = delete; //copy ctor, force move, matrices are too big
 
         matrix& operator=(const matrix& other) = delete; //same for copy assignment
 
-        matrix(const matrix&& other) {
+        fixedvector(matrix&& other) noexcept { //move ctor //noexcept incase malloc throws
 
         }
 
+        matrix& operator=(matrix&& other) noexcept{   //move ctor assigment
+            if (this == &other) return *this;
+            _mm_free(data);
+            data = other.data;
+            rows = other.rows;
+            cols = other.cols;
+            stride = other.stride;
+            other.data = nullptr;
+            other.rows = 0;
+            other.cols = 0;
+            other.stride = 0;
+
+            return *this;
+        }
 
         T& operator ()(const size_t r, const size_t c) {
             return data[r * stride + c];
