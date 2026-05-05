@@ -6,8 +6,11 @@
 #define TRANSFORMER_VECTOR_H
 
 #include <cassert>
-#include <cstdlib> //malloc indirect
-#include <immintrin.h> //AVX2 intrinsics, to replace with assembly
+#include "math.h"
+
+
+//double forward dec
+template <typename T> class fixedvector;
 
 //forward dec
 namespace fastmath {
@@ -16,9 +19,15 @@ namespace fastmath {
 
     template <typename U>
     U dot(const U* data1, const U* data2, size_t size);
+
+    template <typename U>
+    void add(U* dst, const U* src, size_t size);
+
+    template <typename U>
+    void copy(U* dst, const U* src, size_t size);
 }
 
-template <typename T>
+template <typename T> //one of cap/size
 class fixedvector { //EVENTUALLY: replace malloc(arena), rawptr with custom implementations(compress).
     private:
         T* data;
@@ -31,22 +40,18 @@ class fixedvector { //EVENTUALLY: replace malloc(arena), rawptr with custom impl
         }
         fixedvector(size_t n, const T* source): size(n),  capacity(n) { //ctor 3 with a source array & n
             data = (T*)_mm_malloc(n * sizeof(T),32);
-            if (data != nullptr && source != nullptr) {
-                for (size_t i = 0; i < n; i++) {
-                    data[i] = source[i];
-                }
+            fastmath::copy(data, other.data, size);
             }
-        }
-        fixedvector (const fixedvector& other) { //copy ctor
-                data = (T*)_mm_malloc(other.capacity * sizeof(T), 32);
-                size = other.size;
-                capacity = other.capacity;
-                for (size_t i = 0; i < size; i++) {
-                    data[i] = other.data[i];
-                }
+
+    fixedvector(const fixedvector& other) {
+            data = (T*)_mm_malloc(other.capacity * sizeof(T), 32);
+            size = other.size;
+            capacity = other.capacity;
+
+            fastmath::copy(data, other.data, size);
         }
 
-        fixedvector& operator=(const fixedvector& other) {
+        fixedvector& operator=(const fixedvector& other) { //copy assign
             if (this == &other) return *this; //self check
 
             T* new_data = nullptr;
@@ -91,36 +96,6 @@ class fixedvector { //EVENTUALLY: replace malloc(arena), rawptr with custom impl
             _mm_free(data);
         }
 
-        //other operators
-        fixedvector operator+(const fixedvector& other) const { //addition
-            assert(size == other.size);
-            fixedvector result = fixedvector(size);
-            const T* __restrict p1 = data; //tell compiler we are not sharing ptr, can trigger ptimization on GCC
-            const T* __restrict p2 = other.data;
-            for (size_t i = 0; i < size; i++) {
-                result.data[i] = p1[i] + p2[i];
-            }
-            return result;
-        }
-
-        fixedvector& operator*(const T& scalar) { //scalar mult
-            for (size_t i = 0; i < size; i++) {
-                data[i] *= scalar;
-            }
-            return *this;
-        }
-
-        T operator|(const fixedvector& other) const { //dot product
-            assert(size == other.size);
-            T sum = 0;
-            const T* __restrict p1 = data;
-            const T* __restrict p2 = other.data;
-            for (size_t i = 0; i < size; i++) {
-                sum += p1[i] * p2[i];
-            }
-            return sum;
-        }
-
         T& operator [](size_t i) {
             return data[i];
         }
@@ -140,45 +115,57 @@ class fixedvector { //EVENTUALLY: replace malloc(arena), rawptr with custom impl
         size_t get_size() const {
             return size;
         }
+            // operators
 
-};
+        fixedvector &operator+=(const fixedvector& other) { //addition
+            assert(size == other.size);
+            /*fixedvector result = fixedvector(size);
+            const T* __restrict p1 = data; //tell compiler we are not sharing ptr, can trigger ptimization on GCC
+            const T* __restrict p2 = other.data;
+            for (size_t i = 0; i < size; i++) {
+                result.data[i] = p1[i] + p2[i];
+            }*/
+            fastmath::add(& this, & other);
+            return *this;
+        }
 
-//fastops, SIMD in case compiler doesnt optimize dot, and also scalar is better this way.
-namespace fastmath {
-    template <typename U>
-         void scalar_mult(U* data, const size_t size, const U& scalar) {   //fornow, float
-            __m256 v_scalar = _mm256_set1_ps(static_cast<float>(scalar)); //make integer and double math versions later, for U
-            //it writes scalar to 8 slots of 32 byte register (float = 4 byte).
-            size_t i = 0;
-            for (;i +7< size ;i+=8) { //go by 8 to align with AVX2
-                __m256 v_data = _mm256_load_ps((&data[i]));//write to reg
-                __m256 v_res = _mm256_mul_ps(v_scalar, v_data);
-                _mm256_store_ps(&data[i], v_res);
-            }
-            //tail
-            for (; i<size;i+=1) {
+
+         fixedvector operator+(const fixedvector& other) const {
+            fixedvector result = *this;
+            result += other;
+            return result;
+        }
+
+        fixedvector& operator*=(const T& scalar) { //scalar mult
+            /*for (size_t i = 0; i < size; i++) {
                 data[i] *= scalar;
             }
+            return *this;*/ //slow
+            size_t s = this->get_size();
+            return fastmath::scalar_mult(this->data,s,scalar);
         }
-    template <typename U> //needs special compile flags, eg -mavx2 -mfma -O3 -march=haswell
-         U dot(const U* data1, const U* data2, size_t size) {
-            __m256 v_sum = _mm256_setzero_ps(); //filled with zeroes
-            size_t i = 0;
-            for (;i +7< size ;i+=8) { //go by 8 to align with AVX2
-                __m256 v_data1 = _mm256_load_ps((&data1[i]));//write to reg
-                __m256 v_data2 = _mm256_load_ps((&data2[i]));
-                v_sum = _mm256_fmadd_ps(v_data1,v_data2, v_sum);
-        } //horizontal collapse, [] array can be replaced with more optimal register shuffle method
-        alignas(32) float temp[8];
-        _mm256_store_ps(temp, v_sum);
-        float total = temp[0] + temp[1] + temp[2] + temp[3] +
-                      temp[4] + temp[5] + temp[6] + temp[7];
-        for (; i < size; ++i) {
-            total += data1[i] * data2[i];
+
+        // Non-modifying version
+        fixedvector operator*(const T& scalar) const
+            {
+                fixedvector result = *this;  // copy
+                result *= scalar;            // reuse the *= above
+                return result;
+            }
+
+        T operator|(const fixedvector& other) const { //dot product
+            assert(size == other.size);
+            /*T sum = 0;
+            const T* __restrict p1 = data;
+            const T* __restrict p2 = other.data;
+            for (size_t i = 0; i < size; i++) {
+                sum += p1[i] * p2[i];
+            }*/ //slow
+
+            return fastmath::dot(this->data,other.data);
         }
-        return total;
-        }
-}
+
+};
 
 
 

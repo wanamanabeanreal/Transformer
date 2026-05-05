@@ -7,4 +7,5 @@ add_executable(transformer main.cpp
         vector.h
         matrix.h
         math.cpp
-        layer.cpp)
+        layer.cpp
+        math.h)
