@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # --------------------------------------------------------------------------
-# Compiler flags — AVX2 + FMA are required for the SIMD ops in math.h
+# Compiler flags — AVX2 + FMA are required for the SIMD ops in math_utils.h
 # --------------------------------------------------------------------------
 if (MSVC)
     add_compile_options(/arch:AVX2 /O2 /W4)

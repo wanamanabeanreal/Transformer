@@ -12,7 +12,7 @@
 
 // _mm_malloc / _mm_free
 
-#include "math.h"
+#include "math_utils.h"
 
 template <typename T>
 class fixedvector {

@@ -8,10 +8,10 @@
 #pragma once
 
 #include <cassert>
-#include <cstddef>
 #include <immintrin.h>  // _mm_malloc / _mm_free
 
-#include "math.h"
+
+#include "math_utils.h"
 
 template <typename T>
 class matrix {
@@ -69,14 +69,15 @@ public:
     size_t cols()   const { return cols_; }
     size_t stride() const { return stride_; }  // padded row width
 
-    // Deep copy (explicit — avoids accidental copies)
+    // Deep copy
     matrix clone() const {
         matrix out(rows_, cols_);
-        // copy row by row (cols_ elements, not stride_, to skip padding)
         for (size_t r = 0; r < rows_; ++r)
             fastmath::copy(out.row(r), row(r), cols_);
         return out;
     }
+
+
 
 private:
     T*     data_;
